@@ -7,6 +7,7 @@ FactoryBot.define do
 
     trait :cfp do
       name { "Conference CFP" }
+      slug { "cfp" }
     end
   end
 end

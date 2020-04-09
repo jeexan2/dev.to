@@ -1,6 +1,10 @@
 require "rails_helper"
 
 RSpec.describe "Api::V0::Listings" do
+  let_it_be_readonly(:cfp_category) do
+    create(:classified_listing_category, :cfp)
+  end
+
   shared_context "when user is authorized" do
     let(:api_secret) { create(:api_secret) }
     let(:user) { api_secret.user }
@@ -12,14 +16,14 @@ RSpec.describe "Api::V0::Listings" do
       {
         title: "Title",
         body_markdown: "Markdown text",
-        category: "cfp"
+        classified_listing_category_id: cfp_category.id
       }
     end
     let(:draft_params) do
       {
         title: "Title draft",
         body_markdown: "Markdown draft text",
-        category: "cfp",
+        classified_listing_category_id: cfp_category.id,
         action: "draft"
       }
     end
@@ -36,7 +40,7 @@ RSpec.describe "Api::V0::Listings" do
     let(:user2) { create(:user) }
 
     before do
-      create_list(:classified_listing, 3, user: user1, category: "cfp")
+      create_list(:classified_listing, 3, user: user1, category: cfp_category)
       create_list(:classified_listing, 4, user: user2)
     end
   end
@@ -355,7 +359,7 @@ RSpec.describe "Api::V0::Listings" do
         expect do
           post_classified_listing(draft_params)
         end.to change(ClassifiedListing, :count).by(1).
-          and change(user.credits.spent, :size).by(0)
+        and change(user.credits.spent, :size).by(0)
       end
 
       it "does not create a listing or subtract credits if the purchase does not go through" do
@@ -363,7 +367,7 @@ RSpec.describe "Api::V0::Listings" do
         expect do
           post_classified_listing(listing_params)
         end.to change(ClassifiedListing, :count).by(0).
-          and change(user.credits.spent, :size).by(0)
+        and change(user.credits.spent, :size).by(0)
       end
 
       it "creates a classified listing belonging to the user" do
@@ -491,7 +495,7 @@ RSpec.describe "Api::V0::Listings" do
       end
 
       it "bumps the listing and subtract credits" do
-        cost = ClassifiedListing.cost_by_category(listing.category)
+        cost = listing.cost
         create_list(:credit, cost, user: user)
         previous_bumped_at = listing.bumped_at
         expect do
@@ -501,7 +505,7 @@ RSpec.describe "Api::V0::Listings" do
       end
 
       it "bumps the org listing using org credits before user credits" do
-        cost = ClassifiedListing.cost_by_category(org_listing.category)
+        cost = org_listing.cost
         create_list(:credit, cost, organization: organization)
         create_list(:credit, cost, user: user)
         previous_bumped_at = org_listing.bumped_at
@@ -512,7 +516,7 @@ RSpec.describe "Api::V0::Listings" do
       end
 
       it "bumps the org listing using user credits if org credits insufficient and user credits are" do
-        cost = ClassifiedListing.cost_by_category(org_listing.category)
+        cost = org_listing.cost
         create_list(:credit, cost, user: user)
         previous_bumped_at = org_listing.bumped_at
         expect do
@@ -526,7 +530,7 @@ RSpec.describe "Api::V0::Listings" do
       include_context "when user is authorized"
 
       it "publishes a draft and charges user credits if first publish" do
-        cost = ClassifiedListing.cost_by_category(listing_draft.category)
+        cost = listing_draft.cost
         create_list(:credit, cost, user: user)
         expect do
           put_classified_listing(listing_draft.id, action: "publish")
@@ -534,14 +538,14 @@ RSpec.describe "Api::V0::Listings" do
       end
 
       it "publishes a draft and ensures published column is true" do
-        cost = ClassifiedListing.cost_by_category(listing_draft.category)
+        cost = listing_draft.cost
         create_list(:credit, cost, user: user)
         put_classified_listing(listing_draft.id, action: "publish")
         expect(listing_draft.reload.published).to eq(true)
       end
 
       it "publishes an org draft and charges org credits if first publish" do
-        cost = ClassifiedListing.cost_by_category(org_listing_draft.category)
+        cost = org_listing_draft.cost
         create_list(:credit, cost, organization: organization)
         expect do
           put_classified_listing(org_listing_draft.id, action: "publish")
@@ -549,7 +553,7 @@ RSpec.describe "Api::V0::Listings" do
       end
 
       it "publishes an org draft and ensures published column is true" do
-        cost = ClassifiedListing.cost_by_category(org_listing_draft.category)
+        cost = org_listing_draft.cost
         create_list(:credit, cost, organization: organization)
         put_classified_listing(org_listing_draft.id, action: "publish")
         expect(org_listing_draft.reload.published).to eq(true)
